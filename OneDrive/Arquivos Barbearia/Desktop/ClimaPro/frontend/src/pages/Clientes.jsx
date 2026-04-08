@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import api from '../api';
+import clienteService from '../services/clienteService';
 import { PlusCircle, Edit, Trash2, Search } from 'lucide-react';
 
 export default function Clientes() {
@@ -12,8 +12,13 @@ export default function Clientes() {
     nome: '', telefone: '', whatsapp: '', cpf_cnpj: '', endereco: '', bairro: '', cidade: '', observacoes: ''
   });
 
-  const loadClientes = () => {
-    api.get(`/clientes?search=${search}`).then(res => setClientes(res.data)).catch(console.error);
+  const loadClientes = async () => {
+    try {
+      const res = await clienteService.getAll(search);
+      setClientes(res.data);
+    } catch (err) {
+      console.error('Erro ao listar clientes:', err);
+    }
   };
 
   useEffect(() => {
@@ -37,23 +42,29 @@ export default function Clientes() {
     e.preventDefault();
     try {
       if (editingId) {
-        await api.put(`/clientes/${editingId}`, form);
+        await clienteService.update(editingId, form);
       } else {
-        await api.post('/clientes', form);
+        await clienteService.create(form);
       }
       closeModal();
       loadClientes();
     } catch (err) {
-      console.error(err);
+      console.error('Erro ao salvar cliente:', err);
       const errorMsg = err.response?.data?.error || err.message;
-      alert('Erro ao salvar cliente: ' + errorMsg);
+      // Removido alert genérico de dentro da API, agora tratado aqui de forma organizada.
+      // Em uma próxima etapa, podemos adicionar um componente de Toast ou erro visual na tela.
+      console.error('Erro ao salvar cliente:', errorMsg);
     }
   };
 
   const handleDelete = async (id) => {
     if(window.confirm('Tem certeza que deseja excluir?')) {
-      await api.delete(`/clientes/${id}`);
-      loadClientes();
+      try {
+        await clienteService.delete(id);
+        loadClientes();
+      } catch (err) {
+        console.error('Erro ao deletar cliente:', err);
+      }
     }
   }
 

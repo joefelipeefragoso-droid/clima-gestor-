@@ -7,7 +7,11 @@ const getDb = require('./database');
 
 const app = express();
 
-app.use(cors());
+app.use(cors({
+  origin: 'https://appgestor-bnn9.onrender.com',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json());
 const uploadDir = path.join(__dirname, 'uploads');
 const uploadOrcamentosDir = path.join(__dirname, 'uploads', 'orcamentos');
@@ -52,14 +56,14 @@ app.get('/api/dashboard', async (req, res) => {
   try {
     const totalClientes = await db.get('SELECT COUNT(*) as total FROM clientes');
     const totalAgendamentosHoje = await db.get("SELECT COUNT(*) as total FROM agendamentos WHERE data = date('now')");
-    
+
     // Orçamentos do mês atual
     const mesAtual = new Date().toISOString().substring(0, 7); // YYYY-MM
     const orcamentosMes = await db.get("SELECT COUNT(*) as total, SUM(valor_total) as valor FROM orcamentos WHERE data_emissao LIKE ?", [`${mesAtual}%`]);
-    
+
     // Group by status
     const statusOrcamentos = await db.all("SELECT status, COUNT(*) as quantidade FROM orcamentos GROUP BY status");
-    
+
     // Resumo para as listas do dashboard
     const ultimosClientes = await db.all("SELECT id, nome, telefone, created_at FROM clientes ORDER BY created_at DESC LIMIT 5");
     const proximosAgendamentos = await db.all(`
@@ -88,7 +92,7 @@ app.get('/api/dashboard', async (req, res) => {
 app.get('/api/config', async (req, res) => {
   const db = await getDb();
   let config = await db.get('SELECT * FROM empresa_config LIMIT 1');
-  if(!config){
+  if (!config) {
     await db.run('INSERT INTO empresa_config (nome_empresa) VALUES (?)', ['Empresa Padrão']);
     config = await db.get('SELECT * FROM empresa_config LIMIT 1');
   }
@@ -99,22 +103,22 @@ app.put('/api/config', upload.single('logo'), async (req, res) => {
   try {
     const db = await getDb();
     const { nome_empresa, cnpj, telefone, email, endereco, cidade, rodape_pdf } = req.body;
-    
+
     let updateFields = ['nome_empresa = ?', 'cnpj = ?', 'telefone = ?', 'email = ?', 'endereco = ?', 'cidade = ?', 'rodape_pdf = ?', 'updated_at = CURRENT_TIMESTAMP'];
     let updateValues = [nome_empresa, cnpj, telefone, email, endereco, cidade, rodape_pdf];
-    
+
     if (req.file) {
       updateFields.push('logo_url = ?');
       updateValues.push('/uploads/' + req.file.filename);
     }
-    
+
     const configIdQuery = await db.get('SELECT id FROM empresa_config LIMIT 1');
     const id = configIdQuery ? configIdQuery.id : 1;
     updateValues.push(id);
-    
+
     const query = `UPDATE empresa_config SET ${updateFields.join(', ')} WHERE id = ?`;
     await db.run(query, updateValues);
-    
+
     const updatedConfig = await db.get('SELECT * FROM empresa_config LIMIT 1');
     res.json(updatedConfig);
   } catch (err) {
@@ -128,13 +132,13 @@ app.get('/api/clientes', async (req, res) => {
   const search = req.query.search;
   let query = 'SELECT * FROM clientes ORDER BY criacao_hack DESC';
   let params = [];
-  
+
   // Usando um hack simples de order porque criamos created_at, mas SQLite converte datas localmente...
   query = 'SELECT * FROM clientes ORDER BY id DESC';
-  
+
   if (search) {
-     query = 'SELECT * FROM clientes WHERE nome LIKE ? OR telefone LIKE ? OR cpf_cnpj LIKE ? ORDER BY id DESC';
-     params = [`%${search}%`, `%${search}%`, `%${search}%`];
+    query = 'SELECT * FROM clientes WHERE nome LIKE ? OR telefone LIKE ? OR cpf_cnpj LIKE ? ORDER BY id DESC';
+    params = [`%${search}%`, `%${search}%`, `%${search}%`];
   }
   const clientes = await db.all(query, params);
   res.json(clientes);
@@ -161,18 +165,18 @@ app.post('/api/clientes', async (req, res) => {
 });
 
 app.put('/api/clientes/:id', async (req, res) => {
-   try {
-     const db = await getDb();
-     const { id } = req.params;
-     const { nome, telefone, whatsapp, cpf_cnpj, endereco, bairro, cidade, observacoes } = req.body;
-     await db.run(
-       'UPDATE clientes SET nome = ?, telefone = ?, whatsapp = ?, cpf_cnpj = ?, endereco = ?, bairro = ?, cidade = ?, observacoes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-       [nome, telefone, whatsapp, cpf_cnpj, endereco, bairro, cidade, observacoes, id]
-     );
-     res.json({ id });
-   } catch (err) {
-     res.status(500).json({ error: err.message });
-   }
+  try {
+    const db = await getDb();
+    const { id } = req.params;
+    const { nome, telefone, whatsapp, cpf_cnpj, endereco, bairro, cidade, observacoes } = req.body;
+    await db.run(
+      'UPDATE clientes SET nome = ?, telefone = ?, whatsapp = ?, cpf_cnpj = ?, endereco = ?, bairro = ?, cidade = ?, observacoes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [nome, telefone, whatsapp, cpf_cnpj, endereco, bairro, cidade, observacoes, id]
+    );
+    res.json({ id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.delete('/api/clientes/:id', async (req, res) => {
@@ -234,8 +238,8 @@ app.get('/api/categorias', async (req, res) => {
   let query = 'SELECT * FROM categorias ORDER BY nome_categoria ASC';
   let params = [];
   if (nicho) {
-     query = 'SELECT * FROM categorias WHERE nicho = ? ORDER BY nome_categoria ASC';
-     params = [nicho];
+    query = 'SELECT * FROM categorias WHERE nicho = ? ORDER BY nome_categoria ASC';
+    params = [nicho];
   }
   const categorias = await db.all(query, params);
   res.json(categorias);
@@ -277,12 +281,12 @@ app.get('/api/materiais', async (req, res) => {
   const { search, nicho, categoria } = req.query;
   let query = 'SELECT * FROM materiais WHERE 1=1';
   let params = [];
-  
+
   if (nicho) { query += ' AND nicho = ?'; params.push(nicho); }
   if (categoria) { query += ' AND categoria = ?'; params.push(categoria); }
   if (search) {
-     query += ' AND (nome LIKE ? OR categoria LIKE ?)';
-     params.push(`%${search}%`); params.push(`%${search}%`);
+    query += ' AND (nome LIKE ? OR categoria LIKE ?)';
+    params.push(`%${search}%`); params.push(`%${search}%`);
   }
   query += ' ORDER BY nome ASC';
   const materiais = await db.all(query, params);
@@ -329,12 +333,12 @@ app.get('/api/servicos', async (req, res) => {
   const { search, nicho, categoria } = req.query;
   let query = 'SELECT * FROM servicos WHERE 1=1';
   let params = [];
-  
+
   if (nicho) { query += ' AND nicho = ?'; params.push(nicho); }
   if (categoria) { query += ' AND categoria = ?'; params.push(categoria); }
   if (search) {
-     query += ' AND (nome LIKE ? OR categoria LIKE ?)';
-     params.push(`%${search}%`); params.push(`%${search}%`);
+    query += ' AND (nome LIKE ? OR categoria LIKE ?)';
+    params.push(`%${search}%`); params.push(`%${search}%`);
   }
   query += ' ORDER BY nome ASC';
   const items = await db.all(query, params);
@@ -379,7 +383,7 @@ app.delete('/api/servicos/:id', async (req, res) => {
 app.get('/api/orcamentos', async (req, res) => {
   const db = await getDb();
   const { status, search } = req.query;
-  
+
   let query = `
     SELECT o.*, c.nome as cliente_nome
     FROM orcamentos o
@@ -387,21 +391,21 @@ app.get('/api/orcamentos', async (req, res) => {
     WHERE 1=1
   `;
   let params = [];
-  
+
   if (status) {
     query += ` AND o.status = ?`;
     params.push(status);
   }
-  
+
   if (search) {
     query += ` AND (c.nome LIKE ? OR o.numero_orcamento LIKE ? OR c.telefone LIKE ?)`;
     params.push(`%${search}%`);
     params.push(`%${search}%`);
     params.push(`%${search}%`);
   }
-  
+
   query += ` ORDER BY o.id DESC`;
-  
+
   const orcamentos = await db.all(query, params);
   res.json(orcamentos);
 });
@@ -414,7 +418,7 @@ app.get('/api/orcamentos/:id', async (req, res) => {
     LEFT JOIN clientes c ON o.cliente_id = c.id
     WHERE o.id = ?
   `, [req.params.id]);
-  
+
   if (orcamento) {
     const itens = await db.all('SELECT *, nicho as nicho_filtro, categoria as categoria_filtro FROM orcamento_itens WHERE orcamento_id = ?', [req.params.id]);
     const servicos = await db.all('SELECT *, nicho as nicho_filtro, categoria as categoria_filtro FROM orcamento_servicos WHERE orcamento_id = ?', [req.params.id]);
@@ -428,18 +432,18 @@ app.post('/api/orcamentos', async (req, res) => {
   try {
     const db = await getDb();
     const { cliente_id, data_emissao, descricao_servico, mao_de_obra, deslocamento, desconto, valor_total, validade, observacoes, status, itens, tipo_servico, capacidade_equipamento, local_instalacao, prazo_execucao, forma_pagamento, garantia, status_servico, data_execucao, aprovado_cliente, tipo_documento, descricao_detalhada, tecnico_responsavel } = req.body;
-    
+
     // Gerar um número de orçamento incremental simples
     const lastNum = await db.get('SELECT MAX(numero_orcamento) as m FROM orcamentos');
     const numero_orcamento = (lastNum && lastNum.m ? lastNum.m : 1000) + 1;
-    
+
     const result = await db.run(
       'INSERT INTO orcamentos (numero_orcamento, cliente_id, data_emissao, descricao_servico, mao_de_obra, deslocamento, desconto, valor_total, validade, observacoes, status, tipo_servico, capacidade_equipamento, local_instalacao, prazo_execucao, forma_pagamento, garantia, status_servico, data_execucao, aprovado_cliente, tipo_documento, descricao_detalhada, tecnico_responsavel) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [numero_orcamento, cliente_id, data_emissao, descricao_servico, mao_de_obra || 0, deslocamento || 0, desconto || 0, valor_total || 0, validade, observacoes, status || 'em aberto', tipo_servico, capacidade_equipamento, local_instalacao, prazo_execucao, forma_pagamento, garantia, status_servico, data_execucao, aprovado_cliente, tipo_documento, descricao_detalhada, tecnico_responsavel]
     );
-    
+
     const orcamento_id = result.lastID;
-    
+
     // Insert itens
     if (itens && itens.length > 0) {
       for (let item of itens) {
@@ -449,7 +453,7 @@ app.post('/api/orcamentos', async (req, res) => {
         );
       }
     }
-    
+
     // Insert servicos
     if (req.body.servicos && req.body.servicos.length > 0) {
       for (let s of req.body.servicos) {
@@ -459,7 +463,7 @@ app.post('/api/orcamentos', async (req, res) => {
         );
       }
     }
-    
+
     res.json({ id: orcamento_id });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -471,7 +475,7 @@ app.put('/api/orcamentos/:id', async (req, res) => {
     const db = await getDb();
     const { cliente_id, data_emissao, descricao_servico, mao_de_obra, deslocamento, desconto, valor_total, validade, observacoes, status, itens, tipo_servico, capacidade_equipamento, local_instalacao, prazo_execucao, forma_pagamento, garantia, status_servico, data_execucao, aprovado_cliente, tipo_documento, descricao_detalhada, tecnico_responsavel } = req.body;
     const orcamento_id = req.params.id;
-    
+
     await db.run(
       'UPDATE orcamentos SET cliente_id=?, data_emissao=?, descricao_servico=?, mao_de_obra=?, deslocamento=?, desconto=?, valor_total=?, validade=?, observacoes=?, status=?, tipo_servico=?, capacidade_equipamento=?, local_instalacao=?, prazo_execucao=?, forma_pagamento=?, garantia=?, status_servico=?, data_execucao=?, aprovado_cliente=?, tipo_documento=?, descricao_detalhada=?, tecnico_responsavel=?, updated_at=CURRENT_TIMESTAMP WHERE id=?',
       [cliente_id, data_emissao, descricao_servico, mao_de_obra || 0, deslocamento || 0, desconto || 0, valor_total || 0, validade, observacoes, status, tipo_servico, capacidade_equipamento, local_instalacao, prazo_execucao, forma_pagamento, garantia, status_servico, data_execucao, aprovado_cliente, tipo_documento, descricao_detalhada, tecnico_responsavel, orcamento_id]
@@ -481,24 +485,24 @@ app.put('/api/orcamentos/:id', async (req, res) => {
     await db.run('DELETE FROM orcamento_itens WHERE orcamento_id = ?', [orcamento_id]);
     if (itens && itens.length > 0) {
       for (let item of itens) {
-         await db.run(
+        await db.run(
           'INSERT INTO orcamento_itens (orcamento_id, material_id, descricao, quantidade, valor_unitario, valor_total, nicho, categoria) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
           [orcamento_id, item.material_id, item.descricao, item.quantidade, item.valor_unitario, item.valor_total, item.nicho_filtro || null, item.categoria_filtro || null]
         );
       }
     }
-    
+
     // Update servicos similarly
     await db.run('DELETE FROM orcamento_servicos WHERE orcamento_id = ?', [orcamento_id]);
     if (req.body.servicos && req.body.servicos.length > 0) {
       for (let s of req.body.servicos) {
-         await db.run(
+        await db.run(
           'INSERT INTO orcamento_servicos (orcamento_id, servico_id, descricao, quantidade, valor_unitario, valor_total, nicho, categoria) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
           [orcamento_id, s.servico_id, s.descricao, s.quantidade, s.valor_unitario, s.valor_total, s.nicho_filtro || null, s.categoria_filtro || null]
         );
       }
     }
-    
+
     res.json({ id: orcamento_id });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -536,15 +540,15 @@ app.get('/api/orcamentos/:id/detalhada', async (req, res) => {
       LEFT JOIN clientes c ON o.cliente_id = c.id
       WHERE o.id = ?
     `, [orcId]);
-    
-    if (!orcamento) return res.status(404).json({error: 'Not found'});
+
+    if (!orcamento) return res.status(404).json({ error: 'Not found' });
 
     orcamento.itens = await db.all('SELECT * FROM orcamento_itens WHERE orcamento_id = ?', [orcId]);
     orcamento.servicos = await db.all('SELECT * FROM orcamento_servicos WHERE orcamento_id = ?', [orcId]);
     orcamento.gastos = await db.all('SELECT * FROM gastos_orcamento WHERE orcamento_id = ? ORDER BY data DESC', [orcId]);
     orcamento.lembretes = await db.all('SELECT * FROM lembretes_orcamento WHERE orcamento_id = ?', [orcId]);
     orcamento.fotos = await db.all('SELECT * FROM fotos_orcamento WHERE orcamento_id = ? ORDER BY created_at DESC', [orcId]);
-    
+
     res.json(orcamento);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -556,7 +560,7 @@ app.put('/api/orcamentos/:id/base', async (req, res) => {
     const db = await getDb();
     const orcId = req.params.id;
     const { cliente_id, data_emissao, etapa_orcamento, dias_garantia, observacoes, valor_total, total_servicos, total_materiais, total_gastos, status_servico, data_execucao, aprovado_cliente, tipo_documento, descricao_detalhada, tecnico_responsavel, forma_pagamento } = req.body;
-    
+
     await db.run(
       `UPDATE orcamentos SET 
        cliente_id=?, data_emissao=?, etapa_orcamento=?, status=?, dias_garantia=?, observacoes=?, 
@@ -611,7 +615,7 @@ app.put('/api/lembretes/:id', async (req, res) => {
 
 app.post('/api/orcamentos/:id/fotos', uploadFotos.single('foto'), async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({error: 'Nenhum arquivo.'});
+    if (!req.file) return res.status(400).json({ error: 'Nenhum arquivo.' });
     const db = await getDb();
     const url = '/uploads/orcamentos/' + req.file.filename;
     const descricao = req.body.descricao || '';
@@ -633,41 +637,41 @@ app.post('/api/orcamentos/:id/duplicar', async (req, res) => {
   try {
     const db = await getDb();
     const oldId = req.params.id;
-    
+
     const o = await db.get('SELECT * FROM orcamentos WHERE id = ?', [oldId]);
-    if(!o) return res.status(404).json({error: 'Orçamento não encontrado.'});
-    
+    if (!o) return res.status(404).json({ error: 'Orçamento não encontrado.' });
+
     const lastNum = await db.get('SELECT MAX(numero_orcamento) as m FROM orcamentos');
     const newNum = (lastNum && lastNum.m ? lastNum.m : 1000) + 1;
-    
+
     // Inserir base clonada
     const resBase = await db.run(
       `INSERT INTO orcamentos 
        (numero_orcamento, cliente_id, data_emissao, descricao_servico, mao_de_obra, deslocamento, desconto, valor_total, validade, observacoes, status, tipo_servico, capacidade_equipamento, local_instalacao, prazo_execucao, forma_pagamento, garantia, dias_garantia, etapa_orcamento, total_servicos, total_materiais, total_gastos)
        VALUES (?, ?, date('now'), ?, ?, ?, ?, ?, ?, ?, 'em aberto', ?, ?, ?, ?, ?, ?, ?, 'novo', ?, ?, ?)`,
-      [newNum, o.cliente_id, 
-       o.descricao_servico, o.mao_de_obra, o.deslocamento, o.desconto, o.valor_total, o.validade, o.observacoes, 
-       o.tipo_servico, o.capacidade_equipamento, o.local_instalacao, o.prazo_execucao, o.forma_pagamento, o.garantia, o.dias_garantia, o.total_servicos, o.total_materiais, o.total_gastos]
+      [newNum, o.cliente_id,
+        o.descricao_servico, o.mao_de_obra, o.deslocamento, o.desconto, o.valor_total, o.validade, o.observacoes,
+        o.tipo_servico, o.capacidade_equipamento, o.local_instalacao, o.prazo_execucao, o.forma_pagamento, o.garantia, o.dias_garantia, o.total_servicos, o.total_materiais, o.total_gastos]
     );
-    
+
     const newId = resBase.lastID;
-    
+
     // Duplicar Materiais
     const itens = await db.all('SELECT * FROM orcamento_itens WHERE orcamento_id = ?', [oldId]);
-    for(let it of itens) {
-       await db.run('INSERT INTO orcamento_itens (orcamento_id, material_id, descricao, quantidade, valor_unitario, valor_total) VALUES (?, ?, ?, ?, ?, ?)',
-       [newId, it.material_id, it.descricao, it.quantidade, it.valor_unitario, it.valor_total]);
+    for (let it of itens) {
+      await db.run('INSERT INTO orcamento_itens (orcamento_id, material_id, descricao, quantidade, valor_unitario, valor_total) VALUES (?, ?, ?, ?, ?, ?)',
+        [newId, it.material_id, it.descricao, it.quantidade, it.valor_unitario, it.valor_total]);
     }
-    
+
     // Duplicar Servicos
     const servicos = await db.all('SELECT * FROM orcamento_servicos WHERE orcamento_id = ?', [oldId]);
-    for(let s of servicos) {
-       await db.run('INSERT INTO orcamento_servicos (orcamento_id, servico_id, descricao, quantidade, valor_unitario, valor_total) VALUES (?, ?, ?, ?, ?, ?)',
-       [newId, s.servico_id, s.descricao, s.quantidade, s.valor_unitario, s.valor_total]);
+    for (let s of servicos) {
+      await db.run('INSERT INTO orcamento_servicos (orcamento_id, servico_id, descricao, quantidade, valor_unitario, valor_total) VALUES (?, ?, ?, ?, ?, ?)',
+        [newId, s.servico_id, s.descricao, s.quantidade, s.valor_unitario, s.valor_total]);
     }
-    
+
     // (Não duplica gastos nem lembretes conforme requisito, ou se quiser duplicar tudo, faria o mesmo loop)
-    
+
     res.json({ id: newId });
   } catch (err) {
     res.status(500).json({ error: err.message });

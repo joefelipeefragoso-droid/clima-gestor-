@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import api from '../api';
+import agendaService from '../services/agendaService';
+import clienteService from '../services/clienteService';
 import { PlusCircle, Edit, Trash2 } from 'lucide-react';
 
 export default function Agenda() {
@@ -13,12 +14,22 @@ export default function Agenda() {
     tipo_servico: '', tecnico_responsavel: '', observacoes: '', status: 'agendado'
   });
 
-  const loadAgendamentos = () => {
-    api.get('/agendamentos').then(res => setAgendamentos(res.data)).catch(console.error);
+  const loadAgendamentos = async () => {
+    try {
+      const res = await agendaService.getAll();
+      setAgendamentos(res.data);
+    } catch (err) {
+      console.error('Erro ao listar agendamentos:', err);
+    }
   };
   
-  const loadClientes = () => {
-    api.get('/clientes').then(res => setClientes(res.data)).catch(console.error);
+  const loadClientes = async () => {
+    try {
+      const res = await clienteService.getAll();
+      setClientes(res.data);
+    } catch (err) {
+      console.error('Erro ao listar clientes na agenda:', err);
+    }
   };
 
   useEffect(() => {
@@ -46,21 +57,25 @@ export default function Agenda() {
     e.preventDefault();
     try {
       if (editingId) {
-        await api.put(`/agendamentos/${editingId}`, form);
+        await agendaService.update(editingId, form);
       } else {
-        await api.post('/agendamentos', form);
+        await agendaService.create(form);
       }
       closeModal();
       loadAgendamentos();
     } catch (err) {
-      alert('Erro ao salvar agendamento');
+      console.error('Erro ao salvar agendamento:', err);
     }
   };
 
   const handleDelete = async (id) => {
     if(window.confirm('Tem certeza que deseja cancelar/excluir?')) {
-      await api.delete(`/agendamentos/${id}`);
-      loadAgendamentos();
+      try {
+        await agendaService.delete(id);
+        loadAgendamentos();
+      } catch (err) {
+        console.error('Erro ao deletar agendamento:', err);
+      }
     }
   };
 

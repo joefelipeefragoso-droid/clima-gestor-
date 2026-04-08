@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import api from '../api';
+import inventoryService from '../services/inventoryService';
 import { PlusCircle, Search, Edit, Trash2 } from 'lucide-react';
 
 export default function Categorias() {
@@ -10,11 +10,11 @@ export default function Categorias() {
 
   const loadData = async () => {
     try {
-      const q = new URLSearchParams();
-      if(nichoFilter) q.append('nicho', nichoFilter);
-      const res = await api.get(`/categorias?${q.toString()}`);
+      const res = await inventoryService.getCategorias(nichoFilter);
       setCategorias(res.data);
-    } catch (err) { console.error(err); }
+    } catch (err) { 
+      console.error('Erro ao carregar categorias:', err);
+    }
   };
 
   useEffect(() => {
@@ -25,14 +25,16 @@ export default function Categorias() {
     e.preventDefault();
     try {
       if (editingId) {
-        await api.put(`/categorias/${editingId}`, form);
+        await inventoryService.updateCategoria(editingId, form);
         setEditingId(null);
       } else {
-        await api.post('/categorias', form);
+        await inventoryService.createCategoria(form);
       }
       setForm({ nome_categoria: '', nicho: 'Ar-condicionado', descricao: '', status: 'ativo' });
       loadData();
-    } catch (err) { alert('Erro ao salvar categoria'); }
+    } catch (err) { 
+      console.error('Erro ao salvar categoria:', err);
+    }
   };
 
   const handleEdit = (cat) => {
@@ -42,8 +44,12 @@ export default function Categorias() {
 
   const handleDelete = async (id) => {
     if (window.confirm('Excluir categoria? Se houverem serviços atrelados eles ficarão soltos.')) {
-      await api.delete(`/categorias/${id}`);
-      loadData();
+      try {
+        await inventoryService.deleteCategoria(id);
+        loadData();
+      } catch (err) {
+        console.error('Erro ao deletar categoria:', err);
+      }
     }
   };
 

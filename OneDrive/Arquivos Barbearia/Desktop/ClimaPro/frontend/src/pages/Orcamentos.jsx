@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../api';
-import { PlusCircle, Search, Settings, Trash2, Edit } from 'lucide-react';
+import orcamentoService from '../services/orcamentoService';
+import { PlusCircle, Search, Settings, Trash2 } from 'lucide-react';
 import StatusDropdown from '../components/StatusDropdown';
 
 export default function Orcamentos() {
@@ -12,14 +12,13 @@ export default function Orcamentos() {
 
   const loadData = async () => {
     try {
-      const q = new URLSearchParams();
-      if(search) q.append('search', search);
-      if(statusFilter) q.append('status', statusFilter);
-      
-      const res = await api.get(`/orcamentos?${q.toString()}`);
+      const res = await orcamentoService.getAll({ 
+        search, 
+        status: statusFilter 
+      });
       setOrcamentos(res.data);
     } catch (err) {
-      console.error(err);
+      console.error('Erro ao carregar orçamentos:', err);
     }
   };
 
@@ -29,14 +28,22 @@ export default function Orcamentos() {
 
   const handleDelete = async (id) => {
     if(window.confirm('Excluir orçamento permanentemente? Todas as peças, serviços gastos associados serão perdidos.')) {
-      await api.delete(`/orcamentos/${id}`);
-      loadData();
+      try {
+        await orcamentoService.delete(id);
+        loadData();
+      } catch (err) {
+        console.error('Erro ao deletar orçamento:', err);
+      }
     }
   };
 
   const handleUpdateStatusFast = async (id, status) => {
-      await api.put(`/orcamentos/${id}/status`, { status });
+    try {
+      await orcamentoService.updateStatus(id, status);
       loadData();
+    } catch (err) {
+      console.error('Erro ao atualizar status do orçamento:', err);
+    }
   }
 
   const formatBRL = (val) => {

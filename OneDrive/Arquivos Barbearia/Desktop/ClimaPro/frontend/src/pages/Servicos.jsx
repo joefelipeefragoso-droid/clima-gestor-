@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import api from '../api';
+import inventoryService from '../services/inventoryService';
 import { PlusCircle, Edit, Trash2, Search, Briefcase } from 'lucide-react';
 
 export default function Servicos() {
@@ -16,17 +16,15 @@ export default function Servicos() {
 
   const loadData = async () => {
     try {
-      const qs = new URLSearchParams();
-      if(search) qs.append('search', search);
-      if(nichoFilter) qs.append('nicho', nichoFilter);
-      
       const [resS, resC] = await Promise.all([
-         api.get(`/servicos?${qs.toString()}`),
-         api.get('/categorias')
+         inventoryService.getServicos({ search, nicho: nichoFilter }),
+         inventoryService.getCategorias()
       ]);
       setServicos(resS.data);
       setCategoriasMestre(resC.data);
-    } catch(err) { console.error(err); }
+    } catch(err) { 
+      console.error('Erro ao carregar serviços:', err);
+    }
   };
 
   useEffect(() => { loadData(); }, [search, nichoFilter]);
@@ -47,17 +45,26 @@ export default function Servicos() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      if (editingId) await api.put(`/servicos/${editingId}`, form);
-      else await api.post('/servicos', form);
+      if (editingId) {
+        await inventoryService.updateServico(editingId, form);
+      } else {
+        await inventoryService.createServico(form);
+      }
       closeModal();
       loadData();
-    } catch (err) { alert('Erro ao salvar serviço'); }
+    } catch (err) { 
+      console.error('Erro ao salvar serviço:', err);
+    }
   };
 
   const handleDelete = async (id) => {
     if(window.confirm('Tem certeza que deseja excluir?')) {
-      await api.delete(`/servicos/${id}`);
-      loadData();
+      try {
+        await inventoryService.deleteServico(id);
+        loadData();
+      } catch (err) {
+        console.error('Erro ao deletar serviço:', err);
+      }
     }
   }
 

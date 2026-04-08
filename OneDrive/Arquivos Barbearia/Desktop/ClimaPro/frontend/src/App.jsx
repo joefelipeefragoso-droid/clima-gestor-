@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
 import { Home, Calendar, Users, Briefcase, Settings, Package, PenTool, Wrench } from 'lucide-react';
-import api from './api';
+import { BASE_URL } from './services/api';
+import configService from './services/configService';
 
 // Placeholders for Pages
 import Dashboard from './pages/Dashboard';
@@ -18,9 +19,11 @@ function Sidebar() {
   const [logo, setLogo] = useState(null);
   
   useEffect(() => {
-    api.get('/config').then(res => {
-      if (res.data?.logo_url) setLogo(`http://localhost:3001${res.data.logo_url}`);
-    }).catch(console.error);
+    configService.get().then(res => {
+      if (res.data?.logo_url) setLogo(`${BASE_URL}${res.data.logo_url}`);
+    }).catch(err => {
+      console.error('Erro ao carregar configuração no App:', err);
+    });
   }, []);
 
   return (

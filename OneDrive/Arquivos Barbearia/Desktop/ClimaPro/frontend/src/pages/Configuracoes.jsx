@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
-import api from '../api';
+import { BASE_URL } from '../services/api';
+import configService from '../services/configService';
 import { Save, Upload } from 'lucide-react';
 import { flattenImage } from '../utils/imageUtils';
 
@@ -19,14 +20,16 @@ export default function Configuracoes() {
   const [preview, setPreview] = useState(null);
 
   useEffect(() => {
-    api.get('/config').then(res => {
+    configService.get().then(res => {
       if (res.data) {
         setConfig(res.data);
         if (res.data.logo_url) {
-          setPreview(`http://localhost:3001${res.data.logo_url}`);
+          setPreview(`${BASE_URL}${res.data.logo_url}`);
         }
       }
-    }).catch(console.error);
+    }).catch(err => {
+      console.error('Erro ao carregar configurações:', err);
+    });
   }, []);
 
   const handleChange = (e) => {
@@ -59,16 +62,14 @@ export default function Configuracoes() {
       formData.append('rodape_pdf', config.rodape_pdf || '');
       
       if (config.logoFile) {
-        formData.append('logo', config.logoFile);
+        // Garantir que a imagem seja processada se necessário ou enviada como Blob
+        const processedBlob = await flattenImage(config.logoFile);
+        formData.append('logo', processedBlob, 'logo.jpg');
       }
 
-      await api.put('/config', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      alert('Configurações salvas com sucesso!');
+      await configService.update(formData);
     } catch (error) {
-      console.error(error);
-      alert('Erro ao salvar');
+      console.error('Erro ao salvar configurações:', error);
     }
     setLoading(false);
   };

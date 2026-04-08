@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import api from '../api';
-import { Users, Calendar, Briefcase, PlusCircle, Activity, ChevronRight, Droplet } from 'lucide-react';
+import dashboardService from '../services/dashboardService';
+import configService from '../services/configService';
+import { Users, Calendar, Briefcase, Activity, ChevronRight, Droplet } from 'lucide-react';
 
 export default function Dashboard() {
   const [data, setData] = useState({
@@ -17,8 +18,19 @@ export default function Dashboard() {
   const [config, setConfig] = useState({ nome_empresa: 'ClimaGestor' });
 
   useEffect(() => {
-    api.get('/dashboard').then(res => setData(res.data)).catch(console.error);
-    api.get('/config').then(res => setConfig(res.data)).catch(console.error);
+    const loadData = async () => {
+      try {
+        const [dashRes, configRes] = await Promise.all([
+          dashboardService.getSummary(),
+          configService.get()
+        ]);
+        setData(dashRes.data);
+        setConfig(configRes.data);
+      } catch (err) {
+        console.error('Erro ao carregar dados do Dashboard:', err);
+      }
+    };
+    loadData();
   }, []);
 
   return (

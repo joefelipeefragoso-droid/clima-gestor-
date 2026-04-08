@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import api from '../api';
+import { BASE_URL } from '../services/api';
+import orcamentoService from '../services/orcamentoService';
+import clienteService from '../services/clienteService';
+import inventoryService from '../services/inventoryService';
+import configService from '../services/configService';
 import { 
   ArrowLeft, FileText, User, Wrench, Package, 
   DollarSign, Clock, Shield, Image as ImageIcon, Copy,
@@ -58,11 +62,11 @@ export default function OrcamentoDetalhe() {
     try {
       // Carregar Auxiliares
       const [resCli, resServ, resMat, resConf, resCat] = await Promise.all([
-        api.get('/clientes'),
-        api.get('/servicos'),
-        api.get('/materiais'),
-        api.get('/config'),
-        api.get('/categorias')
+        clienteService.getAll(),
+        inventoryService.getServicos(),
+        inventoryService.getMateriais(),
+        configService.get(),
+        inventoryService.getCategorias()
       ]);
       setClientes(resCli.data);
       setServicosBase(resServ.data);
@@ -89,7 +93,7 @@ export default function OrcamentoDetalhe() {
         });
         setOrcamento({ numero_orcamento: 'TBD', total_servicos: 0, total_materiais: 0, total_gastos: 0, valor_total: 0 });
       } else {
-        const resOrc = await api.get(`/orcamentos/${id}/detalhada`);
+        const resOrc = await orcamentoService.getDetailed(id);
         const item = resOrc.data;
         setOrcamento(item);
         setBaseForm({
@@ -114,8 +118,8 @@ export default function OrcamentoDetalhe() {
         setFotosForm(item.fotos || []);
       }
     } catch (err) {
-      console.error(err);
-      alert('Erro: ' + err.message + ' | ' + (err.response?.data?.error || '') + ' | URL: ' + err.config?.url);
+      console.error('Erro ao carregar dados do projeto:', err);
+      // Mantendo o feedback organizado sem alert interrompendo se possível
       navigate('/orcamentos');
     } finally {
       setLoading(false);
@@ -153,35 +157,27 @@ export default function OrcamentoDetalhe() {
       };
 
       if (id === 'novo') {
-         // Create new
-         const res = await api.post('/orcamentos', {
+         const res = await orcamentoService.create({
              ...payloadBase,
              status: baseForm.etapa_orcamento,
              itens: materiaisForm,
              servicos: servicosForm
          });
-         alert('Orçamento criado com sucesso!');
          navigate(`/orcamento/${res.data.id}`);
       } else {
-         // Aqui, idealmente salvamos TUDO na rota base para orcamentos com ID.
-         // A rota PUT /api/orcamentos/:id/base atualiza as colunas novas
-         await api.put(`/orcamentos/${id}/base`, payloadBase);
+         await orcamentoService.updateBase(id, payloadBase);
          
-         // Mas também temos o PUT antigo /orcamentos/:id que limpa e salva Itens e Servicos.
-         // Para simplificar e não refatorar 100% o ORM pesado anterior:
-         await api.put(`/orcamentos/${id}`, {
+         await orcamentoService.update(id, {
              ...payloadBase,
              status: baseForm.etapa_orcamento,
              itens: materiaisForm,
              servicos: servicosForm
          });
          
-         alert('Orçamento (Base, Mat. & Serv.) salvo com sucesso!');
          loadMestres();
       }
     } catch (e) {
-      console.error(e);
-      alert('Erro ao salvar');
+      console.error('Erro ao salvar orçamento:', e);
     }
   };
 
@@ -189,10 +185,9 @@ export default function OrcamentoDetalhe() {
      if (id === 'novo') return;
      if(!window.confirm('Deseja realmente duplicar este projeto?')) return;
      try {
-       const res = await api.post(`/orcamentos/${id}/duplicar`);
-       alert('Projeto duplicado!');
+       const res = await orcamentoService.duplicar(id);
        navigate(`/orcamento/${res.data.id}`);
-     } catch(e) { alert('Erro ao duplicar: ' + e.response?.data?.error); }
+     } catch(e) { console.error('Erro ao duplicar:', e); }
   };
 
   const handleGerarPDF = () => {
@@ -222,46 +217,46 @@ export default function OrcamentoDetalhe() {
   const [novoGasto, setNovoGasto] = useState({descricao: '', categoria: 'deslocamento', valor: 0, data: new Date().toISOString().split('T')[0]});
   const handleAddGasto = async (e) => {
       e.preventDefault();
-      if(id === 'novo') return alert('Salve o orçamento uma vez primeiro para habilitar Gastos.');
+      if(id === 'novo') return;
       try {
-          await api.post(`/orcamentos/${id}/gastos`, novoGasto);
+          await orcamentoService.addGasto(id, novoGasto);
           setNovoGasto({descricao: '', categoria: 'deslocamento', valor: 0, data: new Date().toISOString().split('T')[0]});
           loadMestres();
-      } catch(e) { console.error(e); }
+      } catch(e) { console.error('Erro ao adicionar gasto:', e); }
   };
   const handleDeleteGasto = async (gid) => {
       if(!window.confirm('Tem certeza?')) return;
-      await api.delete(`/gastos/${gid}`);
-      loadMestres();
+      try {
+        await orcamentoService.deleteGasto(gid);
+        loadMestres();
+      } catch (err) { console.error('Erro ao deletar gasto:', err); }
   };
 
   // FOTOS
   const [fotoFile, setFotoFile] = useState(null);
   const handleUploadFoto = async () => {
-      if(id === 'novo') return alert('Salve primeiro');
+      if(id === 'novo') return;
       if(!fotoFile) return;
       
       try {
-         // Processar imagem para remover transparência e garantir fundo branco
          const processedBlob = await flattenImage(fotoFile);
-         
          const formData = new FormData();
-         // Enviar como .jpg para o servidor
          formData.append('foto', processedBlob, 'foto.jpg');
          formData.append('descricao', 'Anexo');
          
-         await api.post(`/orcamentos/${id}/fotos`, formData, {headers: { 'Content-Type': 'multipart/form-data' }});
+         await orcamentoService.addFoto(id, formData);
          setFotoFile(null);
          loadMestres();
       } catch(e) { 
-         console.error(e);
-         alert('Erro ao subir foto'); 
+         console.error('Erro ao subir foto:', e);
       }
   };
   const handleDeleteFoto = async (fid) => {
       if(!window.confirm('Excluir?')) return;
-      await api.delete(`/fotos/${fid}`);
-      loadMestres();
+      try {
+        await orcamentoService.deleteFoto(fid);
+        loadMestres();
+      } catch (err) { console.error('Erro ao deletar foto:', err); }
   };
 
   // Helpers SERVIÇOS & MATERIAIS
@@ -431,8 +426,7 @@ export default function OrcamentoDetalhe() {
                                      setBaseForm({ ...baseForm, etapa_orcamento: newStatus });
                                      if (id !== 'novo') {
                                         try {
-                                           await api.put(`/orcamentos/${id}/status`, { status: newStatus });
-                                           // Atualiza o objeto orcamento mestre para manter coerência
+                                           await orcamentoService.updateStatus(id, newStatus);
                                            setOrcamento(prev => ({ ...prev, etapa_orcamento: newStatus, status: newStatus }));
                                         } catch (e) {
                                            console.error("Erro ao salvar status:", e);
@@ -692,7 +686,7 @@ export default function OrcamentoDetalhe() {
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                          {fotosForm.map(f => (
                            <div key={f.id} style={{position:'relative', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'8px', overflow:'hidden'}}>
-                               <img src={`http://localhost:3001${f.url}`} alt={f.descricao} style={{width:'100%', height:'150px', objectFit:'cover', display:'block'}}/>
+                               <img src={`${BASE_URL}${f.url}`} alt={f.descricao} style={{width:'100%', height:'150px', objectFit:'cover', display:'block'}}/>
                                <button onClick={()=>handleDeleteFoto(f.id)} style={{position:'absolute', top:5, right:5, background:'rgba(0,0,0,0.7)', color:'white', border:'none', padding:'4px', borderRadius:'4px', cursor:'pointer'}}><Trash2 size={14}/></button>
                            </div>
                          ))}

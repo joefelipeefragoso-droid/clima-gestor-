@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import api from '../api';
+import inventoryService from '../services/inventoryService';
 import { PlusCircle, Edit, Trash2, Search, Package } from 'lucide-react';
 
 export default function Materiais() {
@@ -16,17 +16,15 @@ export default function Materiais() {
 
   const loadData = async () => {
     try {
-      const qs = new URLSearchParams();
-      if(search) qs.append('search', search);
-      if(nichoFilter) qs.append('nicho', nichoFilter);
-
       const [resM, resC] = await Promise.all([
-          api.get(`/materiais?${qs.toString()}`),
-          api.get('/categorias')
+          inventoryService.getMateriais({ search, nicho: nichoFilter }),
+          inventoryService.getCategorias()
       ]);
       setMateriais(resM.data);
       setCategoriasMestre(resC.data);
-    } catch(err) { console.error(err); }
+    } catch(err) { 
+      console.error('Erro ao carregar materiais:', err);
+    }
   };
 
   useEffect(() => { loadData(); }, [search, nichoFilter]);
@@ -47,17 +45,26 @@ export default function Materiais() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      if (editingId) await api.put(`/materiais/${editingId}`, form);
-      else await api.post('/materiais', form);
+      if (editingId) {
+        await inventoryService.updateMaterial(editingId, form);
+      } else {
+        await inventoryService.createMaterial(form);
+      }
       closeModal();
       loadData();
-    } catch (err) { alert('Erro ao salvar'); }
+    } catch (err) { 
+      console.error('Erro ao salvar material:', err);
+    }
   };
 
   const handleDelete = async (id) => {
     if(window.confirm('Excluir peça?')) {
-      await api.delete(`/materiais/${id}`);
-      loadData();
+      try {
+        await inventoryService.deleteMaterial(id);
+        loadData();
+      } catch (err) {
+        console.error('Erro ao deletar material:', err);
+      }
     }
   }
 

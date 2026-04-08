@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { BUDGET_STATUS, normalizeStatus } from './statusConstants';
+import { BASE_URL } from '../services/api';
 
 // Helper: Converter Hex para RGB
 const hexToRgb = (hex) => {
@@ -64,7 +65,7 @@ export const generateOrcamentoPDF = async (orcamento, config) => {
   // --- 0. MARCA D'ÁGUA (BACKGROUND) ---
   try {
     if (config?.logo_url) {
-      const logo = await loadImage(`http://localhost:3001${config.logo_url}`);
+      const logo = await loadImage(`${API_URL}${config.logo_url}`);
       const watermarkW = pageWidth * 0.80; // 80% da largura
       const watermarkH = (logo.height / logo.width) * watermarkW;
       
@@ -106,7 +107,7 @@ export const generateOrcamentoPDF = async (orcamento, config) => {
   // --- LOGO ---
   try {
     if (config?.logo_url) {
-      const logo = await loadImage(`http://localhost:3001${config.logo_url}`);
+      const logo = await loadImage(`${API_URL}${config.logo_url}`);
       // Aumentando a altura máxima permitida para a logo no cabeçalho
       const logoSize = getContainSize(logo.width, logo.height, 80, 48);
       doc.addImage(

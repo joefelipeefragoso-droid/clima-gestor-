@@ -2,35 +2,54 @@ const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
 const getDb = require('./database');
 
 const app = express();
+
 app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+const uploadDir = path.join(__dirname, 'uploads');
+const uploadOrcamentosDir = path.join(__dirname, 'uploads', 'orcamentos');
+
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+if (!fs.existsSync(uploadOrcamentosDir)) {
+  fs.mkdirSync(uploadOrcamentosDir, { recursive: true });
+}
+
+// Configuração para servir o frontend buildado
+const frontendPath = path.join(__dirname, '..', 'frontend', 'dist');
+app.use(express.static(frontendPath));
+
 // Configuração do multer para upload de logo
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, 'uploads/')
+    cb(null, 'uploads/');
   },
   filename: function (req, file, cb) {
     const ext = path.extname(file.originalname);
     cb(null, 'logo_' + Date.now() + ext);
   }
 });
+
 const upload = multer({ storage: storage });
 
 // Configuração do multer para fotos do orçamento
 const storageFotos = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, 'uploads/orcamentos/')
+    cb(null, 'uploads/orcamentos/');
   },
   filename: function (req, file, cb) {
     const ext = path.extname(file.originalname);
     cb(null, 'foto_' + Date.now() + ext);
   }
 });
+
 const uploadFotos = multer({ storage: storageFotos });
 
 /* --- ROTAS: DASHBOARD --- */
@@ -661,7 +680,13 @@ app.post('/api/orcamentos/:id/duplicar', async (req, res) => {
   }
 });
 
-const PORT = 3001;
+// Rota final para o SPA (deve vir após as rotas da API)
+app.get('*', (req, res) => {
+  res.sendFile(path.join(frontendPath, 'index.html'));
+});
+
+const PORT = process.env.PORT || 3000;
+
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
 });

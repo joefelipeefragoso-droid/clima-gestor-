@@ -9,8 +9,6 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
 const uploadDir = path.join(__dirname, 'uploads');
 const uploadOrcamentosDir = path.join(__dirname, 'uploads', 'orcamentos');
 
@@ -21,10 +19,6 @@ if (!fs.existsSync(uploadDir)) {
 if (!fs.existsSync(uploadOrcamentosDir)) {
   fs.mkdirSync(uploadOrcamentosDir, { recursive: true });
 }
-
-// Configuração para servir o frontend buildado
-const frontendPath = path.join(__dirname, '..', 'frontend', 'dist');
-app.use(express.static(frontendPath));
 
 // Configuração do multer para upload de logo
 const storage = multer.diskStorage({
@@ -680,9 +674,15 @@ app.post('/api/orcamentos/:id/duplicar', async (req, res) => {
   }
 });
 
+// Serve arquivos de upload
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 // Rota final para o SPA (deve vir após as rotas da API)
+const frontendDistPath = path.join(__dirname, '..', 'frontend', 'dist');
+app.use(express.static(frontendDistPath));
+
 app.get('*', (req, res) => {
-  res.sendFile(path.join(frontendPath, 'index.html'));
+  res.sendFile(path.join(frontendDistPath, 'index.html'));
 });
 
 const PORT = process.env.PORT || 3000;
